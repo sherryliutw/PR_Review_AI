@@ -69,14 +69,7 @@ def generate_review(
     return review.strip()
 
 
-def run_test_examples(model, tokenizer) -> None:
-    """
-    Run a set of test code review examples to evaluate the fine-tuned model.
-
-    Prints the generated reviews for manual inspection.
-    """
-
-    test_cases = [
+TEST_EXAMPLES = [
         {
             "name": "JSON → YAML migration without error handling",
             "file_path": "utils/parser.py",
@@ -260,13 +253,21 @@ def run_test_examples(model, tokenizer) -> None:
                 "    return sum(numbers) / len(numbers)"
             ),
         },
-    ]
+]
+
+
+def run_test_examples(model, tokenizer) -> None:
+    """
+    Run a set of test code review examples to evaluate the fine-tuned model.
+
+    Prints the generated reviews for manual inspection.
+    """
 
     print("=" * 60)
     print("🧪 Running Test Inference")
     print("=" * 60)
 
-    for i, tc in enumerate(test_cases, 1):
+    for i, tc in enumerate(TEST_EXAMPLES, 1):
         print(f"\n{'─' * 60}")
         print(f"Test {i}: {tc['name']}")
         print(f"File: {tc['file_path']}")
