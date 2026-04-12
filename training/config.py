@@ -83,7 +83,7 @@ USE_BF16 = False                    # For A100 (set USE_FP16=False if using this
 # =============================================================================
 
 GENERATION_MAX_TOKENS = 512
-GENERATION_TEMPERATURE = 0.7
+GENERATION_TEMPERATURE = 0.01
 GENERATION_TOP_P = 0.9
 GENERATION_REPETITION_PENALTY = 1.1
 
