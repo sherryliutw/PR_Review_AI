@@ -15,6 +15,7 @@ from datasets import DatasetDict, load_dataset
 from training.config import (
     CACHED_DATASET_DIR,
     DATASET_NAME,
+    EXCLUDE_NEGATIVE,
     LANGUAGE_FILTER,
     MAX_CODE_LINES,
     MAX_SEQ_LENGTH,
@@ -59,7 +60,15 @@ def load_and_filter_dataset() -> DatasetDict:
     print(f"🔍 Filtering: quality_score >= {QUALITY_THRESHOLD}")
     dataset = dataset.filter(lambda x: x["quality_score"] >= QUALITY_THRESHOLD)
 
-    # --- Filter 3: Code length bounds ---
+    # --- Filter 3: Exclude negative examples (v3) ---
+    if EXCLUDE_NEGATIVE:
+        print("🔍 Filtering: excluding is_negative=True ('no issues found' examples)")
+        before = len(dataset["train"])
+        dataset = dataset.filter(lambda x: not x["is_negative"])
+        after = len(dataset["train"])
+        print(f"   Removed {before - after:,} negative examples from train split")
+
+    # --- Filter 4: Code length bounds ---
     print(f"🔍 Filtering: code lines in [{MIN_CODE_LINES}, {MAX_CODE_LINES}]")
     dataset = dataset.filter(
         lambda x: (
@@ -68,7 +77,7 @@ def load_and_filter_dataset() -> DatasetDict:
         )
     )
 
-    # --- Filter 4: Subsample training set to fit Colab time limits ---
+    # --- Filter 5: Subsample training set to fit Colab time limits ---
     if TRAIN_SAMPLE_LIMIT and len(dataset["train"]) > TRAIN_SAMPLE_LIMIT:
         print(f"🎲 Subsampling train set: {len(dataset['train']):,} → {TRAIN_SAMPLE_LIMIT:,}")
         dataset["train"] = dataset["train"].shuffle(seed=42).select(range(TRAIN_SAMPLE_LIMIT))
