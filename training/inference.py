@@ -87,19 +87,23 @@ TEST_EXAMPLES = [
             ),
         },
         {
-            "name": "SQL query without parameterization",
-            "file_path": "db/queries.py",
+            "name": "Unused variable and redundant assignment",
+            "file_path": "services/processor.py",
             "before_code": (
-                "def get_user(conn, user_id):\n"
-                "    cursor = conn.cursor()\n"
-                "    cursor.execute(f'SELECT * FROM users WHERE id = {user_id}')\n"
-                "    return cursor.fetchone()"
+                "def process_data(items):\n"
+                "    results = []\n"
+                "    for item in items:\n"
+                "        results.append(transform(item))\n"
+                "    return results"
             ),
             "after_code": (
-                "def get_user(conn, user_id):\n"
-                "    cursor = conn.cursor()\n"
-                "    cursor.execute(f'SELECT * FROM users WHERE id = {user_id} AND active = 1')\n"
-                "    return cursor.fetchone()"
+                "def process_data(items):\n"
+                "    results = []\n"
+                "    temp = []\n"
+                "    for item in items:\n"
+                "        processed = transform(item)\n"
+                "        results.append(processed)\n"
+                "    return results"
             ),
         },
         {
@@ -213,23 +217,20 @@ TEST_EXAMPLES = [
             ),
         },
         {
-            "name": "N+1 query pattern in loop",
-            "file_path": "services/order_report.py",
+            "name": "Loop should be a list comprehension",
+            "file_path": "utils/formatting.py",
             "before_code": (
-                "def order_totals(user_ids):\n"
-                "    rows = db.session.query(Order).filter(Order.user_id.in_(user_ids)).all()\n"
-                "    totals = {}\n"
-                "    for row in rows:\n"
-                "        totals[row.user_id] = totals.get(row.user_id, 0) + row.amount\n"
-                "    return totals"
+                "def get_emails(users):\n"
+                "    return [u.email for u in users if u.is_active]"
             ),
             "after_code": (
-                "def order_totals(user_ids):\n"
-                "    totals = {}\n"
-                "    for uid in user_ids:\n"
-                "        rows = db.session.query(Order).filter(Order.user_id == uid).all()\n"
-                "        totals[uid] = sum(r.amount for r in rows)\n"
-                "    return totals"
+                "def get_emails(users):\n"
+                "    emails = []\n"
+                "    for u in users:\n"
+                "        if u.is_active:\n"
+                "            email = u.email\n"
+                "            emails.append(email)\n"
+                "    return emails"
             ),
         },
         {
