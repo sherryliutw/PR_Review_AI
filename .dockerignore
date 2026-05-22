@@ -1,0 +1,12 @@
+.git
+.github
+.claude
+.env
+*.pem
+*.db
+__pycache__
+*.pyc
+*.ipynb
+helm/
+docs/
+*.md

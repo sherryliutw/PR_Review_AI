@@ -1,0 +1,12 @@
+apiVersion: v2
+name: pr-review-ai
+description: AI-powered GitHub PR reviewer using a fine-tuned CodeLlama model
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
+dependencies:
+  - name: postgresql
+    version: "16.4.1"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled

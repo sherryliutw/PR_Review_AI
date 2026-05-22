@@ -12,6 +12,12 @@ Usage (from Colab notebook):
 import os
 from pathlib import Path
 
+# IMPORTANT: import unsloth BEFORE trl/transformers so its monkey-patches
+# (fused LoRA Triton kernels, fast cross-entropy, etc.) apply to the
+# SFTTrainer training loop. Importing in the wrong order silently disables
+# most of the speedup. See docs/v2_evaluation.md for context.
+import unsloth  # noqa: F401  (import-for-side-effects)
+
 from trl import SFTConfig, SFTTrainer
 
 from training.config import (
@@ -88,9 +94,14 @@ def get_training_args() -> SFTConfig:
         eval_strategy="epoch",
         load_best_model_at_end=False,
         # Performance
-        gradient_checkpointing=True,
+        # gradient_checkpointing is handled by Unsloth via
+        # use_gradient_checkpointing="unsloth" in apply_lora(). Enabling it
+        # here too would double-wrap and break Unsloth's optimized impl.
+        gradient_checkpointing=False,
         max_grad_norm=0.3,
-        optim="paged_adamw_32bit",
+        # adamw_8bit is Unsloth's recommended optimizer on T4 — lower VRAM
+        # than paged_adamw_32bit with no accuracy loss for LoRA training.
+        optim="adamw_8bit",
         # SFT-specific
         dataset_text_field="text",
         max_seq_length=MAX_SEQ_LENGTH,

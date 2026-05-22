@@ -18,24 +18,57 @@ import sys
 
 
 def install_dependencies() -> None:
-    """Install required pip packages (silent mode)."""
+    """
+    Install Unsloth + its pinned training stack for v2 (Plan A++).
 
+    Per docs/BUG_TRACKING.md "v2 Unsloth Migration" section, we follow
+    Unsloth's official install line rather than pinning transformers/trl
+    ourselves — Unsloth pulls in the exact compatible versions as
+    transitive deps. Manually pinning them here would fight Unsloth's
+    resolver and re-ignite the SFTTrainer version war.
+
+    TODO(plan-a++): After the 500-sample smoke test passes, lock this to a
+    specific Unsloth commit SHA (not `main`) so re-runs stay reproducible:
+        "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git@<sha>"
+
+    Rollback: if Unsloth blocks progress, revert this function to the v1
+    pins below and run Plan A (10K × 2 epochs, vanilla HF stack):
+        "transformers>=4.46.0,<4.48.0"
+        "trl>=0.12.0,<1.0.0"
+        "peft>=0.10.0"
+        "bitsandbytes>=0.43.0"
+        "accelerate>=0.30.0"
+        "datasets>=2.19.0"
+    """
+
+    # Unsloth's colab-new extra installs torch/xformers/bitsandbytes/peft/
+    # trl/transformers at versions it has tested together. Leave version
+    # resolution to Unsloth — do NOT add extra pins here.
     packages = [
-        "transformers>=4.46.0,<4.48.0",
-        "datasets>=2.19.0",
-        "peft>=0.10.0",
-        "bitsandbytes>=0.43.0",
-        "accelerate>=0.30.0",
-        "trl>=0.12.0,<1.0.0",
+        "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git",
+        "datasets>=2.19.0",  # stack-agnostic, Unsloth doesn't pin this
     ]
 
-    print("📦 Installing dependencies...")
+    print("📦 Installing Unsloth + training stack...")
     subprocess.check_call(
         [sys.executable, "-m", "pip", "install", "-q"] + packages,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
     print("   ✅ Dependencies installed")
+
+    # Echo versions so the smoke-test notebook output captures what actually
+    # got resolved — critical for locking the commit SHA later.
+    try:
+        import transformers, trl, peft  # noqa
+        import unsloth  # noqa
+        print(
+            f"   unsloth={unsloth.__version__}, "
+            f"transformers={transformers.__version__}, "
+            f"trl={trl.__version__}, peft={peft.__version__}"
+        )
+    except Exception as e:
+        print(f"   ⚠️  Could not print resolved versions: {e}")
 
 
 def mount_google_drive() -> None:
@@ -125,7 +158,7 @@ def detect_gpu() -> dict:
     current_precision = "bf16" if USE_BF16 else ("fp16" if USE_FP16 else "fp32")
     if current_precision != precision:
         print(f"\n   ⚠️  Your config uses {current_precision}, but {precision} is recommended for {gpu_name}.")
-        print(f"      Update USE_FP16/USE_BF16 in training/config.py if needed.")
+        print("      Update USE_FP16/USE_BF16 in training/config.py if needed.")
 
     if BATCH_SIZE != batch_size:
         print(f"   ⚠️  Your config uses batch_size={BATCH_SIZE}, recommended: {batch_size}")

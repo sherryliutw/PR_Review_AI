@@ -23,8 +23,16 @@ class ModelService:
     def is_loaded(self) -> bool:
         return self.model is not None
 
+    @property
+    def dry_run(self) -> bool:
+        return settings.skip_model_load
+
     def load(self) -> None:
         """Load base model + LoRA adapter. Called once during FastAPI lifespan startup."""
+        if self.dry_run:
+            logger.info("SKIP_MODEL_LOAD=true — running in dry-run mode (no GPU required)")
+            return
+
         from training.model import load_for_inference
 
         logger.info("Loading model with adapter from %s", settings.adapter_path)
@@ -35,6 +43,9 @@ class ModelService:
 
     def review(self, before_code: str, after_code: str, file_path: str) -> str:
         """Generate a code review for a before/after code pair."""
+        if self.dry_run:
+            return f"[DRY RUN] Model inference skipped for {file_path}"
+
         if not self.is_loaded:
             raise RuntimeError("Model not loaded — call load() first")
 

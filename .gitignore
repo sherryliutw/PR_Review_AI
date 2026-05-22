@@ -11,3 +11,8 @@ __pycache__/
 
 # IDE / tooling
 .claude/
+
+# Documentation
+claude.md
+CLAUDE.md
+docs/

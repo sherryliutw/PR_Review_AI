@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pr-review-ai.fullname" . }}
+  labels:
+    {{- include "pr-review-ai.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pr-review-ai.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pr-review-ai.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: MODEL_NAME
+              value: {{ .Values.env.MODEL_NAME | quote }}
+            - name: ADAPTER_PATH
+              value: {{ .Values.env.ADAPTER_PATH | quote }}
+            - name: SKIP_MODEL_LOAD
+              value: {{ .Values.env.SKIP_MODEL_LOAD | default "false" | quote }}
+            - name: GITHUB_PRIVATE_KEY_PATH
+              value: "/secrets/github-private-key.pem"
+          envFrom:
+            - secretRef:
+                name: {{ include "pr-review-ai.fullname" . }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: github-key
+              mountPath: /secrets
+              readOnly: true
+            {{- if .Values.adapter.enabled }}
+            - name: adapter
+              mountPath: /app/code-review-lora-adapter
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: github-key
+          secret:
+            secretName: {{ include "pr-review-ai.fullname" . }}
+            items:
+              - key: github-private-key.pem
+                path: github-private-key.pem
+        {{- if .Values.adapter.enabled }}
+        - name: adapter
+          {{- if .Values.adapter.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.adapter.existingClaim }}
+          {{- else if .Values.adapter.hostPath }}
+          hostPath:
+            path: {{ .Values.adapter.hostPath }}
+            type: Directory
+          {{- end }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

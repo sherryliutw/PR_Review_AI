@@ -70,6 +70,7 @@ async def health():
     return {
         "status": "healthy",
         "model_loaded": model_service.is_loaded,
+        "dry_run": model_service.dry_run,
     }
 
 

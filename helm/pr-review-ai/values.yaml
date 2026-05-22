@@ -1,0 +1,75 @@
+# ---------------------------------------------------------------------------
+# PR Review AI — Helm Values
+# ---------------------------------------------------------------------------
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/zenlyst/pr-review-ai
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# GPU resources for model inference (bitsandbytes 4-bit quantization)
+resources:
+  requests:
+    memory: "8Gi"
+    cpu: "2"
+    nvidia.com/gpu: "1"
+  limits:
+    memory: "16Gi"
+    cpu: "4"
+    nvidia.com/gpu: "1"
+
+# -- Environment variables (non-secret) --
+env:
+  MODEL_NAME: "codellama/CodeLlama-7b-Instruct-hf"
+  ADAPTER_PATH: "/app/code-review-lora-adapter"
+  DATABASE_URL: ""  # Overridden by template when postgresql.enabled=true
+
+# -- Secrets (provide via --set or external secret manager) --
+secrets:
+  githubAppId: ""
+  githubWebhookSecret: ""
+  githubPrivateKey: ""         # PEM key content (base64-encoded in secret)
+
+# -- LoRA adapter volume --
+adapter:
+  # Mount a PVC containing the LoRA adapter weights
+  enabled: false
+  existingClaim: ""
+  # Or use a hostPath for single-node clusters
+  hostPath: ""
+
+# -- Service --
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+# -- Ingress --
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: pr-review-ai.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# -- PostgreSQL subchart --
+postgresql:
+  enabled: true
+  auth:
+    username: prreview
+    password: ""               # Set via --set postgresql.auth.password=...
+    database: prreview
+  primary:
+    persistence:
+      size: 5Gi
+
+# -- Pod configuration --
+nodeSelector: {}
+tolerations: []
+affinity: {}

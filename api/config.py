@@ -24,8 +24,9 @@ class Settings(BaseSettings):
     # Model
     model_name: str = "codellama/CodeLlama-7b-Instruct-hf"
     adapter_path: str = "./code-review-lora-adapter"
+    skip_model_load: bool = False  # Set True for CPU dry-run (tests API without GPU)
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
     @cached_property
     def github_private_key(self) -> str:

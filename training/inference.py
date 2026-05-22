@@ -69,14 +69,7 @@ def generate_review(
     return review.strip()
 
 
-def run_test_examples(model, tokenizer) -> None:
-    """
-    Run a set of test code review examples to evaluate the fine-tuned model.
-
-    Prints the generated reviews for manual inspection.
-    """
-
-    test_cases = [
+TEST_EXAMPLES = [
         {
             "name": "JSON → YAML migration without error handling",
             "file_path": "utils/parser.py",
@@ -94,19 +87,23 @@ def run_test_examples(model, tokenizer) -> None:
             ),
         },
         {
-            "name": "SQL query without parameterization",
-            "file_path": "db/queries.py",
+            "name": "Unused variable and redundant assignment",
+            "file_path": "services/processor.py",
             "before_code": (
-                "def get_user(conn, user_id):\n"
-                "    cursor = conn.cursor()\n"
-                "    cursor.execute(f'SELECT * FROM users WHERE id = {user_id}')\n"
-                "    return cursor.fetchone()"
+                "def process_data(items):\n"
+                "    results = []\n"
+                "    for item in items:\n"
+                "        results.append(transform(item))\n"
+                "    return results"
             ),
             "after_code": (
-                "def get_user(conn, user_id):\n"
-                "    cursor = conn.cursor()\n"
-                "    cursor.execute(f'SELECT * FROM users WHERE id = {user_id} AND active = 1')\n"
-                "    return cursor.fetchone()"
+                "def process_data(items):\n"
+                "    results = []\n"
+                "    temp = []\n"
+                "    for item in items:\n"
+                "        processed = transform(item)\n"
+                "        results.append(processed)\n"
+                "    return results"
             ),
         },
         {
@@ -128,13 +125,150 @@ def run_test_examples(model, tokenizer) -> None:
                 "    return dest"
             ),
         },
-    ]
+        # ---- v2 expanded eval set (added 2026-04-07) ----
+        {
+            "name": "Hardcoded API key in source",
+            "file_path": "services/stripe_client.py",
+            "before_code": (
+                "import os\n"
+                "import stripe\n"
+                "\n"
+                "stripe.api_key = os.environ['STRIPE_API_KEY']\n"
+                "\n"
+                "def charge(amount, token):\n"
+                "    return stripe.Charge.create(amount=amount, source=token)"
+            ),
+            "after_code": (
+                "import stripe\n"
+                "\n"
+                "stripe.api_key = 'sk_live_EXAMPLEFAKEKEYDONOTUSE'  # hardcoded secret\n"
+                "\n"
+                "def charge(amount, token):\n"
+                "    return stripe.Charge.create(amount=amount, source=token)"
+            ),
+        },
+        {
+            "name": "Bare except swallows exceptions",
+            "file_path": "services/notifier.py",
+            "before_code": (
+                "def send_notification(user, message):\n"
+                "    try:\n"
+                "        client.send(user.email, message)\n"
+                "    except SMTPException as e:\n"
+                "        logger.error('failed to send: %s', e)\n"
+                "        raise"
+            ),
+            "after_code": (
+                "def send_notification(user, message):\n"
+                "    try:\n"
+                "        client.send(user.email, message)\n"
+                "    except:\n"
+                "        pass"
+            ),
+        },
+        {
+            "name": "Mutable default argument",
+            "file_path": "utils/cache.py",
+            "before_code": (
+                "def add_item(item, items=None):\n"
+                "    if items is None:\n"
+                "        items = []\n"
+                "    items.append(item)\n"
+                "    return items"
+            ),
+            "after_code": (
+                "def add_item(item, items=[]):\n"
+                "    items.append(item)\n"
+                "    return items"
+            ),
+        },
+        {
+            "name": "DB connection without context manager",
+            "file_path": "db/repo.py",
+            "before_code": (
+                "def fetch_orders(user_id):\n"
+                "    with psycopg2.connect(DSN) as conn:\n"
+                "        with conn.cursor() as cur:\n"
+                "            cur.execute('SELECT * FROM orders WHERE user_id = %s', (user_id,))\n"
+                "            return cur.fetchall()"
+            ),
+            "after_code": (
+                "def fetch_orders(user_id):\n"
+                "    conn = psycopg2.connect(DSN)\n"
+                "    cur = conn.cursor()\n"
+                "    cur.execute('SELECT * FROM orders WHERE user_id = %s', (user_id,))\n"
+                "    return cur.fetchall()"
+            ),
+        },
+        {
+            "name": "Implicit None dereference after Optional return",
+            "file_path": "services/user_lookup.py",
+            "before_code": (
+                "def get_display_name(user_id):\n"
+                "    user = db.find_user(user_id)\n"
+                "    if user is None:\n"
+                "        return 'unknown'\n"
+                "    return user.name.title()"
+            ),
+            "after_code": (
+                "def get_display_name(user_id):\n"
+                "    user = db.find_user(user_id)\n"
+                "    return user.name.title()"
+            ),
+        },
+        {
+            "name": "Loop should be a list comprehension",
+            "file_path": "utils/formatting.py",
+            "before_code": (
+                "def get_emails(users):\n"
+                "    return [u.email for u in users if u.is_active]"
+            ),
+            "after_code": (
+                "def get_emails(users):\n"
+                "    emails = []\n"
+                "    for u in users:\n"
+                "        if u.is_active:\n"
+                "            email = u.email\n"
+                "            emails.append(email)\n"
+                "    return emails"
+            ),
+        },
+        {
+            "name": "Negative example — clean refactor, no issues",
+            "file_path": "utils/math_utils.py",
+            "before_code": (
+                "def average(numbers):\n"
+                "    total = 0\n"
+                "    count = 0\n"
+                "    for n in numbers:\n"
+                "        total += n\n"
+                "        count += 1\n"
+                "    if count == 0:\n"
+                "        return 0\n"
+                "    return total / count"
+            ),
+            "after_code": (
+                "def average(numbers):\n"
+                "    if not numbers:\n"
+                "        return 0\n"
+                "    return sum(numbers) / len(numbers)"
+            ),
+        },
+]
+
+
+def run_test_examples(model, tokenizer) -> None:
+    """
+    Run a set of test code review examples to evaluate the fine-tuned model.
+
+    Prints the generated reviews for manual inspection.
+    """
 
     print("=" * 60)
     print("🧪 Running Test Inference")
     print("=" * 60)
 
-    for i, tc in enumerate(test_cases, 1):
+    for i, tc in enumerate(TEST_EXAMPLES, 1):
         print(f"\n{'─' * 60}")
         print(f"Test {i}: {tc['name']}")
         print(f"File: {tc['file_path']}")
